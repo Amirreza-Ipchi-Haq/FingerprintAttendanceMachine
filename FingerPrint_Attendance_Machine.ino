@@ -82,7 +82,7 @@ void setup()
   Serial.println("Clock Ready!");
   pinMode(2, OUTPUT);
   Serial.println("Speaker Ready!");
-  pinMode(3, INPUT);
+  pinMode(3, INPUT_PULLUP);
   LCD.setCursor(5, 0);
   LCD.print("Ready!");
   delay(1000);
