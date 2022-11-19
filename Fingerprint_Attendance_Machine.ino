@@ -24,7 +24,7 @@ SoftwareSerial mySerial(2, 3);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 String command;
 bool inside, gb;
-unsigned int id;
+unsigned long long id;
 LCD_I2C LCD(0x27, 16, 2);
 RTClib myRTC;
 DateTime now;
