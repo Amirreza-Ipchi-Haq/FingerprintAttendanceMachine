@@ -258,7 +258,7 @@ bool getFingerprintID(){//Initialize the fingerprint reading function
 	}
 	return 1;//Return true
 }
-void print(String message,bool Switch,bool error,bool Delay){//Initialize the printing function
+void print(const String message,const bool Switch,const bool error,const bool Delay){//Initialize the printing function
 	if(Switch){//Show the message on the LCD screen if the switch is enabled
 		lcd.clear();//Clear the screen
 		if(error)//Show 'Error!' on the screen if this is an error message
@@ -270,7 +270,7 @@ void print(String message,bool Switch,bool error,bool Delay){//Initialize the pr
 		Serial.println(message);
 	return;
 }
-void getFingerprintEnroll(unsigned id,bool Switch){//Initialize the fingerprint enroll function
+void getFingerprintEnroll(const unsigned id,const bool Switch){//Initialize the fingerprint enroll function
 	uint8_t p=-1;//Initialize fingerprint sensor outputter
 	if(Switch)//Notify on the LCD screen if the switch is enabled
 		lcd.clear(),lcd.print("Waiting for a"),lcd.setCursor(0,1),lcd.print("valid finger");
@@ -332,7 +332,7 @@ void getFingerprintEnroll(unsigned id,bool Switch){//Initialize the fingerprint 
 		Serial.println("Place same finger again");
 	delay(1000);//Wait 1 second
 	while(p!=FINGERPRINT_OK){//Read until a fingerprint is detected
-		if(Switch=digitalRead(3)==HIGH)//Return if the switch is disabled
+		if(digitalRead(3)==HIGH)//Return if the switch is disabled
 			return;
 		p=finger.getImage();//Read a fingerprint
 		switch(p){
@@ -390,7 +390,7 @@ void getFingerprintEnroll(unsigned id,bool Switch){//Initialize the fingerprint 
 	case FINGERPRINT_OK://(Model stored)
 		auto formerTemplateCount=finger.templateCount;//Save previous number of templates
 		finger.getTemplateCount();//Get the number of templates
-		if(Switch=finger.templateCount > formerTemplateCount){//Add the new user if the current & the previous number of templates differ
+		if(finger.templateCount > formerTemplateCount){//Add the new user if the current & the previous number of templates differ
 			data.open("DATA",FILE_WRITE);//Open `DATA`
 			while(!data);//Stop if failed to open the file
 			data.write(1);//Write `00000001` to the file
