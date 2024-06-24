@@ -42,9 +42,9 @@ void setup(){
 		Serial.println("Initialization failed. Please insert MicroSD card and reset the device (or enter any character to format the MicroSD card if it's already inserted).");
 		while(!Serial.available());//Wait for a character entry
 		if(formatter.format(m_card,sectorBuffer,&Serial))//Format the MicroSD card
-			Serial.println("Please restart the device...");
-		else//Stop the code if formatting has failed
-			while(1);
+			reset();
+		else
+			while(1);//Stop the code if formatting has failed
 	}else
 		Serial.println("Initialization done.");
 	if(!sd.exists("DATA")){//Create the `DATA` file if it doesn't exist
@@ -82,7 +82,7 @@ void loop(){
 		command.trim();//Trim the command string
 		if(command!=""){
 			if(command=="help")//Show help
-				Serial.println("Here's the list of all commands:\nattendee list       Shows a list of all attendees\nclear log           Clears the entries & exits\ndst                 Toggles the DST (Daylight Saving Time)\nenroll              Saves a new fingerprint\nerase fingerprints  Erases all saved fingerprint\nformat              Formats the MicroSD card and resets the device\nhelp                Shows the list of all commands\nreset data          Resets the participation data\nsaved fingerprints  Shows the number of saved fingerprints\nshow log            Shows the entries & exits\ntime                Changes time configured for the device");
+				Serial.println("Here's the list of all commands:\nattendee list			 Shows a list of all attendees\nclear log					 Clears the entries & exits\ndst								 Toggles the DST (Daylight Saving Time)\nenroll							Saves a new fingerprint\nerase fingerprints	Erases all saved fingerprint\nformat							Formats the MicroSD card and resets the device\nhelp								Shows the list of all commands\nreset data					Resets the participation data\nsaved fingerprints	Shows the number of saved fingerprints\nshow log						Shows the entries & exits\ntime								Changes time configured for the device");
 			else if(command == "dst"){//Change DST
 				sd.remove("DST");//Delete the `DST` file
 				data.open("DST",FILE_WRITE);//Create a new `DST` file
@@ -141,15 +141,17 @@ void loop(){
 				while(sd.exists("DATA"))//Attempt to delete `DATA` until it's deleted
 					sd.remove("DATA");//Delete the file
 				Serial.println("Erased all saved fingerprints successfully!");//Notify
-				delay(2000);//Delay for 2 seconds
 				reset();//Reset the device
 			}else if(command == "format"){//Format the MicroSD card
 				if(formatter.format(m_card,sectorBuffer,&Serial))//Format the MicroSD card
-					Serial.println("Please restart your device...");
+					reset();
+				else
+					while(1);
 			}else if(command=="time"){
-				Serial.println("Please enter your date & time in `ss,mm,hh,DD,MM,YYYY` (without DST):");
+				Serial.println("Please enter your date & time in `YYYY,MM,DD,hh,mm,ss` (without DST):");
 				while(!Serial.available());
-				rtc.adjust(DateTime(Serial.parseInt(),Serial.parseInt(),Serial.parseInt(),Serial.parseInt(),Serial.parseInt(),Serial.parseInt())),Serial.println("Done!");
+				uint16_t clock[6];
+				clock[0]=Serial.parseInt(),clock[1]=Serial.parseInt(),clock[2]=Serial.parseInt(),clock[3]=Serial.parseInt(),clock[4]=Serial.parseInt(),clock[5]=Serial.parseInt(),rtc.adjust(DateTime(clock[0],clock[1],clock[2],clock[3],clock[4],clock[5])),Serial.println("Done!");
 			}else//Alert if an invalid command has been entered
 				Serial.println("Invalid command!");
 		}
