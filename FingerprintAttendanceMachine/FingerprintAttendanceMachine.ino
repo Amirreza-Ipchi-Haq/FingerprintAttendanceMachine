@@ -50,7 +50,7 @@ void setup(){
 	if(!sd.exists("DATA")){//Create the `DATA` file if it doesn't exist
 		data.open("DATA",FILE_WRITE);//Open the file
 		while(!data);//Stop if failed to open the file
-		for(auto i=finger.templateCount;i--;)//Write a character with a byte of `00000001` to the file `n` times (where `n` is the number of fingerprints)
+		for(unsigned long long i=finger.templateCount;i--;)//Write a character with a byte of `00000001` to the file `n` times (where `n` is the number of fingerprints)
 			data.write('\0');
 		data.close();//Close the file
 	}
@@ -66,6 +66,10 @@ void setup(){
 		data.close();//Close the file
 		dst=0;//Give the DST variable the default value
 	}
+	while(!sd.exists("SUM"))
+		sd.mkdir("SUM");
+	while(!sd.exists("LAST"))
+		sd.mkdir("LAST");
 	lcd.begin(),lcd.backlight();//Start the LCD screen
 	rtc.begin();//Start the clock module
 	pinMode(2,OUTPUT);//Initialize the buzzer pin
@@ -82,8 +86,8 @@ void loop(){
 		command.trim();//Trim the command string
 		if(command!=""){
 			if(command=="help")//Show help
-				Serial.println("Here's the list of all commands:\nattendee list			 Shows a list of all attendees\nclear log					 Clears the entries & exits\ndst								 Toggles the DST (Daylight Saving Time)\nenroll							Saves a new fingerprint\nerase fingerprints	Erases all saved fingerprint\nformat							Formats the MicroSD card and resets the device\nhelp								Shows the list of all commands\nreset data					Resets the participation data\nsaved fingerprints	Shows the number of saved fingerprints\nshow log						Shows the entries & exits\ntime								Changes time configured for the device");
-			else if(command == "dst"){//Change DST
+				Serial.println("Here's the list of all commands:\nattendance time     Shows attendance time\nattendee list       Shows a list of all attendees\nclear log           Clears the entries & exits\ndst                 Toggles the DST (Daylight Saving Time)\nenroll              Saves a new fingerprint\nerase fingerprints  Erases all saved fingerprint\nformat              Formats the MicroSD card and resets the device\nhelp                Shows the list of all commands\nreset attendance    Resets attendance time\nreset data          Resets the participation data\nsaved fingerprints  Shows the number of saved fingerprints\nshow log            Shows the entries & exits\ntime                Changes time configured for the device");
+			else if(command=="dst"){//Change DST
 				sd.remove("DST");//Delete the `DST` file
 				data.open("DST",FILE_WRITE);//Create a new `DST` file
 				while(!data);//Stop if failed to open the file
@@ -103,11 +107,10 @@ void loop(){
 				data.close();//Close the file
 			}else if(command=="reset data"){//Delete the `DATA` file and create a new one
 				Serial.print("Resetting data...");//Notify
-				while(sd.exists("DATA"))//Attempt to delete the file until it's deleted
-					sd.remove("DATA");//Delete the file
+				resetData();
 				data.open("DATA",FILE_WRITE);//Open a new `DATA file
 				while(!data);//Stop if failed to open the file
-				for(auto i=finger.templateCount;i--;)//Write a character with a byte of `00000001` to the file `n` times (where `n` is the number of fingerprints)
+				for(unsigned long long i=finger.templateCount;i--;)//Write a character with a byte of `00000001` to the file `n` times (where `n` is the number of fingerprints)
 					data.write('\0');
 				data.close();//Close the file
 				Serial.println("Reset data successfully!");//Notify
@@ -116,7 +119,7 @@ void loop(){
 				while(sd.exists("LOG.txt"))//Attempt to delete the file until it's deleted
 					sd.remove("LOG.txt");//Delete the file
 				Serial.println("Cleared log successfully!");//Notify
-			}else if(command == "show log"){//Show the contents of `LOG.txt`
+			}else if(command=="show log"){//Show the contents of `LOG.txt`
 				if(sd.exists("LOG.txt")){//Open the file if it exists
 					data.open("LOG.txt",FILE_READ);//Open the file
 					while(!data);//Stop if failed to open the file
@@ -138,8 +141,7 @@ void loop(){
 			}else if(command=="erase fingerprints"){//Erase fingerprint templates, delete `DATA` file and reset device
 				Serial.print("Erasing all saved fingerprints...");//Notify
 				finger.emptyDatabase();//Erase all fingerprint templates
-				while(sd.exists("DATA"))//Attempt to delete `DATA` until it's deleted
-					sd.remove("DATA");//Delete the file
+				resetData();
 				Serial.println("Erased all saved fingerprints successfully!");//Notify
 				reset();//Reset the device
 			}else if(command == "format"){//Format the MicroSD card
@@ -152,6 +154,32 @@ void loop(){
 				while(!Serial.available());
 				uint16_t clock[6];
 				clock[0]=Serial.parseInt(),clock[1]=Serial.parseInt(),clock[2]=Serial.parseInt(),clock[3]=Serial.parseInt(),clock[4]=Serial.parseInt(),clock[5]=Serial.parseInt(),rtc.adjust(DateTime(clock[0],clock[1],clock[2],clock[3],clock[4],clock[5])),Serial.println("Done!");
+			}else if(command=="attendance time"){
+				unsigned ID;
+				Serial.println("Please enter your fingerprint ID:");
+				do{
+					while(!Serial.available());
+					ID=Serial.parseInt();
+				}while(!ID||ID>finger.templateCount);
+				if(sd.exists("SUM/"+String(ID))){
+					unsigned long time=0;
+					data.open(("SUM/"+String(ID)).c_str());
+					while(data.available())
+						time=time*10+data.read()-'0';
+					data.close();
+					Serial.print("Days: "),Serial.println(time/86400),Serial.print("Hours: "),Serial.println(time%86400/3600),Serial.print("Minutes: "),Serial.println(time%3600/60),Serial.print("Seconds: "),Serial.println(time%60);
+				}else
+					Serial.println("Days: 0\nHours: 0\nMinutes: 0\nSeconds: 0");
+			}else if(command=="reset attendance"){
+				unsigned ID;
+				Serial.println("Please enter your fingerprint ID:");
+				do{
+					while(!Serial.available());
+					ID=Serial.parseInt();
+				}while(!ID||ID>finger.templateCount);
+				while(sd.exists("SUM/"+String(ID)))
+					sd.remove("SUM/"+String(ID));
+				Serial.println("Attendance time has been reset successfully!");
 			}else//Alert if an invalid command has been entered
 				Serial.println("Invalid command!");
 		}
@@ -159,6 +187,7 @@ void loop(){
 	if(!digitalRead(3))//Enroll a new fingerprint if the enroll switch is enabled
 		getFingerprintEnroll(finger.templateCount+1,1);
 	if(getFingerprintID()){//Read fingerprints
+		unsigned long last=0;
 		now=dst?rtc.now()+TimeSpan(0,1,0,0):rtc.now();//Set current time
 		data.open("DATA",FILE_READ);//Open `DATA` file
 		tmp.open("TMP",FILE_WRITE);//Open `TMP file
@@ -171,6 +200,38 @@ void loop(){
 				tmp.write(data.read());
 		data.close();//Close `DATA`
 		tmp.close();//Close `TMP`
+		if(sd.exists("LAST/"+String(finger.fingerID))){
+			data.open(("LAST/"+String(finger.fingerID)).c_str(),FILE_READ);
+			while(!data);
+			while(data.available())
+				last=last*10+data.read()-'0';
+			data.close();
+			last=now.unixtime()-last;
+		}else
+			last=0;
+		while(sd.exists("LAST/"+String(finger.fingerID)))
+			sd.remove("LAST/"+String(finger.fingerID));
+		data.open(("LAST/"+String(finger.fingerID)).c_str(),FILE_WRITE);
+		while(!data);
+		data.print(now.unixtime());
+		data.close();
+		if(sd.exists("SUM/"+String(finger.fingerID))){
+			unsigned long last0=0;
+			data.open(("SUM/"+String(finger.fingerID)).c_str(),FILE_READ);
+			while(!data);
+			while(data.available())
+				last0=last0*10+data.read()-'0';
+			data.close();
+			last+=last0;
+		}
+		if(inside){
+			while(sd.exists("SUM/"+String(finger.fingerID)))
+				sd.remove("SUM/"+String(finger.fingerID));
+			data.open(("SUM/"+String(finger.fingerID)).c_str(),FILE_WRITE);
+			while(!data);
+			data.print(last);
+			data.close();
+		}
 		while(sd.exists("DATA"))//Attempt to delete `DATA` file until it's deleted
 			sd.remove("DATA");//Delete the file
 		data.open("DATA",FILE_WRITE);//Open a new `DATA` file
@@ -240,6 +301,28 @@ void loop(){
 	else
 		lcd.setCursor(5,1);
 	lcd.print(now.hour()),lcd.print(':'),lcd.print(now.minute()/10),lcd.print(now.minute()%10),lcd.print(':'),lcd.print(now.second()/10),lcd.print(now.second()%10);//Show the time on the LCD screen
+	return;
+}
+void resetData(){
+	while(sd.exists("DATA"))//Attempt to delete the file until it's deleted
+		sd.remove("DATA");
+	File32 dir;
+	char name[11];
+	dir.open("SUM");
+	for(File32 file=dir.openNextFile();file;file=dir.openNextFile()){
+		file.getName(name,10);
+		file.close();
+		while(sd.exists("SUM/"+String(name)))
+			sd.remove("SUM/"+String(name));
+	}
+	dir.close(),dir.open("LAST");
+	for(File32 file=dir.openNextFile();file;file=dir.openNextFile()){
+		file.getName(name,10);
+		file.close();
+		while(sd.exists("LAST/"+String(name)))
+			sd.remove("LAST/"+String(name));
+	}
+	dir.close();
 	return;
 }
 char getFingerprintID(){//Initialize the fingerprint reading function
@@ -387,7 +470,7 @@ void getFingerprintEnroll(const unsigned id,const char Switch){//Initialize the 
 	p=finger.storeModel(id);//Store model
 	switch(p){
 		case FINGERPRINT_OK://(Model stored)
-			auto formerTemplateCount=finger.templateCount;//Save previous number of templates
+			unsigned long long formerTemplateCount=finger.templateCount;//Save previous number of templates
 			finger.getTemplateCount();//Get the number of templates
 			if(finger.templateCount > formerTemplateCount){//Add the new user if the current & the previous number of templates differ
 				data.open("DATA",FILE_WRITE);//Open `DATA`
