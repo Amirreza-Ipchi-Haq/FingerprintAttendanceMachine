@@ -207,8 +207,7 @@ void loop(){
 				last=last*10+data.read()-'0';
 			data.close();
 			last=now.unixtime()-last;
-		}else
-			last=0;
+		}
 		while(sd.exists("LAST/"+String(finger.fingerID)))
 			sd.remove("LAST/"+String(finger.fingerID));
 		data.open(("LAST/"+String(finger.fingerID)).c_str(),FILE_WRITE);
