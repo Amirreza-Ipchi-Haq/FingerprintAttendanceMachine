@@ -123,6 +123,17 @@ void loop(){
 							tmp.write(data.read());
 					data.close();//Close `DATA`
 					tmp.close();
+					while(sd.exists("DATA"))//Attempt to delete `DATA` file until it's deleted
+						sd.remove("DATA");//Delete the file
+					data.open("DATA",FILE_WRITE);//Open a new `DATA` file
+					tmp.open("TMP",FILE_READ);//Open the `TMP` file again
+					while(!data||!tmp);//Stop if failed to open any of the files
+					while(tmp.available())//Copy all of the contents from `TMP` to `DATA`
+						data.write(tmp.read());
+					data.close();//Close `DATA`
+					tmp.close();//Close `TMP`
+					while(sd.exists("TMP"))//Attempt to delete `TMP` until it's deleted
+						sd.remove("TMP");//Delete the file
 				}else{
 					resetData(1);
 					data.open("DATA",FILE_WRITE);//Open a new `DATA file
