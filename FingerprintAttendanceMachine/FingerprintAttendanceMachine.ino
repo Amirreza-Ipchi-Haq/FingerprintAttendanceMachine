@@ -42,7 +42,7 @@ void setup(){
 		Serial.println("Initialization failed. Please insert MicroSD card and reset the device (or enter any character to format the MicroSD card if it's already inserted).");
 		while(!Serial.available());//Wait for a character entry
 		if(formatter.format(m_card,sectorBuffer,&Serial))//Format the MicroSD card
-			reset();
+			delay(2000),reset();
 		else
 			while(1);//Stop the code if formatting has failed
 	}else
@@ -106,13 +106,31 @@ void loop(){
 				}
 				data.close();//Close the file
 			}else if(command=="reset data"){//Delete the `DATA` file and create a new one
-				Serial.print("Resetting data...");//Notify
-				resetData();
-				data.open("DATA",FILE_WRITE);//Open a new `DATA file
-				while(!data);//Stop if failed to open the file
-				for(unsigned long long i=finger.templateCount;i--;)//Write a character with a byte of `00000001` to the file `n` times (where `n` is the number of fingerprints)
-					data.write('\0');
-				data.close();//Close the file
+				unsigned ID;
+				Serial.println("Please enter your fingerprint ID:");
+				do{
+					while(!Serial.available());
+					ID=Serial.parseInt();
+				}while(ID>finger.templateCount);
+				if(ID){
+					data.open("DATA",FILE_READ);
+					tmp.open("TMP",FILE_WRITE);
+					while(!data||!tmp);
+					while(data.available())//Copy the contents of `DATA` to `TMP`
+						if(data.position()==ID-1){//Replace the byte which indicates the current user with either `00000001` or `00000010`
+							tmp.write('\0');//Copy the opposite to `TMP`
+						}else//Copy the rest of the bytes as they are
+							tmp.write(data.read());
+					data.close();//Close `DATA`
+					tmp.close();
+				}else{
+					resetData(1);
+					data.open("DATA",FILE_WRITE);//Open a new `DATA file
+					while(!data);//Stop if failed to open the file
+					for(unsigned long long i=finger.templateCount;i--;)//Write a character with a byte of `00000001` to the file `n` times (where `n` is the number of fingerprints)
+						data.write('\0');
+					data.close();//Close the file
+				}
 				Serial.println("Reset data successfully!");//Notify
 			}else if(command=="clear log"){//Delete the `LOG.txt` file
 				Serial.print("Clearing log...");//Notify
@@ -141,12 +159,13 @@ void loop(){
 			}else if(command=="erase fingerprints"){//Erase fingerprint templates, delete `DATA` file and reset device
 				Serial.print("Erasing all saved fingerprints...");//Notify
 				finger.emptyDatabase();//Erase all fingerprint templates
-				resetData();
-				Serial.println("Erased all saved fingerprints successfully!");//Notify
+				resetData(1);
+				Serial.println("Erased all saved fingerprints successfully!");//Notify'
+				delay(2000);
 				reset();//Reset the device
 			}else if(command == "format"){//Format the MicroSD card
 				if(formatter.format(m_card,sectorBuffer,&Serial))//Format the MicroSD card
-					reset();
+					delay(2000),reset();
 				else
 					while(1);
 			}else if(command=="time"){
@@ -176,9 +195,14 @@ void loop(){
 				do{
 					while(!Serial.available());
 					ID=Serial.parseInt();
-				}while(!ID||ID>finger.templateCount);
-				while(sd.exists("SUM/"+String(ID)))
-					sd.remove("SUM/"+String(ID));
+				}while(ID>finger.templateCount);
+				if(ID){
+					while(sd.exists("LAST/"+String(ID)))
+						sd.remove("LAST/"+String(ID));
+					while(sd.exists("SUM/"+String(ID)))
+						sd.remove("SUM/"+String(ID));
+				}else
+					resetData(0);
 				Serial.println("Attendance time has been reset successfully!");
 			}else//Alert if an invalid command has been entered
 				Serial.println("Invalid command!");
@@ -302,9 +326,10 @@ void loop(){
 	lcd.print(now.hour()),lcd.print(':'),lcd.print(now.minute()/10),lcd.print(now.minute()%10),lcd.print(':'),lcd.print(now.second()/10),lcd.print(now.second()%10);//Show the time on the LCD screen
 	return;
 }
-void resetData(){
-	while(sd.exists("DATA"))//Attempt to delete the file until it's deleted
-		sd.remove("DATA");
+void resetData(char mode){
+	if(mode)
+		while(sd.exists("DATA"))//Attempt to delete the file until it's deleted
+			sd.remove("DATA");
 	File32 dir;
 	char name[11];
 	dir.open("SUM");
